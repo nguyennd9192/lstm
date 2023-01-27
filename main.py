@@ -8,6 +8,7 @@ from plot import *
 
 
 def load_lwhp_data():
+	
 
 	filename = input_dir + "LW_HP.csv"
 	df = pd.read_csv(filename)
@@ -15,6 +16,9 @@ def load_lwhp_data():
 	df['month'] = pd.DatetimeIndex(df['date']).month
 	df['day'] = pd.DatetimeIndex(df['date']).day
 
+
+	indexes = (df.index)
+	n_days = len(df['year'])
 	date_time = pd.to_datetime(df['date'], dayfirst=False)
 	print (df.head())
 	timestamp_s = date_time.map(pd.Timestamp.timestamp)
@@ -26,33 +30,110 @@ def load_lwhp_data():
 	df['Year_sin'] = np.sin(timestamp_s * (2 * np.pi / year))
 	df['Year_cos'] = np.cos(timestamp_s * (2 * np.pi / year))
 
-	id_test = [1, 365, 365*2]
+	# # # split train/test
+	mask = df['demand'].isnull()
+	test_df = df[mask]
+	train_df = df[~mask]
 
-	# # test cvt
+	train_data = input_dir + "LW_HP_train.csv"
+	test_data = input_dir + "LW_HP_test.csv"
+
+	train_df.to_csv(train_data)
+	test_df.to_csv(test_data)
+
+
+	id_test = np.concatenate([	[k, 365*3+k]
+			for k in range(1, 365, 30)
+		 ])
+
+	# # test convert
 	fig = plt.figure(figsize=(8, 8))
 	plt.plot(np.array(df['Year_sin']))
 	plt.plot(np.array(df['Year_cos']))
 
-	for it in id_test:
-		plt.text(it, df.loc[it, ['Year_sin']], df.loc[it, 'date'])
+	name = [None] * n_days
 
-	plt.xlabel('Time (convert)')
+	for it in id_test:
+		this_sin = df.loc[it, 'Year_sin']
+		this_date = df.loc[it, 'date']
+		plt.text(it, this_sin, this_date)
+		name[it] = this_date
+
+	plt.ylabel('Time (convert)')
 	plt.title('Time of day signal')
 	saveat = result_dir +"/LW_HP/time_of_day.pdf"
 	makedirs(saveat)
 	plt.savefig(saveat)
 	release_mem(fig)
 
-	coloraray, mappable = get_normcolor(c_value=df['year'], v_range=None)
+	# # # specify xtickname
+	# xtick_pos = np.arange(-1.0, 1.1, 0.25)
+	# xtick_name = []
+	# oneyear_df = df[:365]
+	# oneyear_idx = oneyear_df.index
+	# ys_round = np.round(oneyear_df['Year_sin'], 2)
+	# for s in xtick_pos:
+	# 	tmp = oneyear_idx[ys_round==s][0]
+	# 	this_date = str(oneyear_df.loc[tmp, 'date'])
+	# 	md = this_date[:this_date.rfind("/")]
+	# 	xtick_name.append(md)
+	# coloraray, mappable = get_normcolor(c_value=this_year_df['date'], v_range=None)
 
-	saveat = result_dir +"/LW_HP/demand_day.pdf"
-	scatter_plot(x=df['Year_sin'], y=df['demand'], ax=None, xvline=None, yhline=None, 
-	    sigma=None, mode='scatter', lbl=None, name=None, 
-	    x_label='x', y_label='y', 
-	    save_file=saveat, interpolate=False, coloraray=coloraray, mappable=mappable,
-	    linestyle='-.', marker='o', title=None)
+	# # ind
+	# # # merge
+	fig = plt.figure(figsize=(9, 16), linewidth=0.8)
+	years = range(2018, 2022) # list(set(df['year']))
+	n_years = len(years)
+	grid = plt.GridSpec(n_years, 4, hspace=0.3, wspace=1)
 
+
+	for ith, year in enumerate(years):
+		if ith==0:
+			ax = fig.add_subplot(grid[ith, :]) # xticklabels=[], sharex=ax
+			allyear_file = None
+
+		elif ith == len(years) - 1:
+			ax = fig.add_subplot(grid[ith, :])
+			allyear_file = result_dir +"/LW_HP/demand_years/multiple.pdf"
+
+		else:
+			ax = fig.add_subplot(grid[ith, :])
+			allyear_file = None
+
+
+		this_year_df = train_df[train_df['year'] == year].sort_values('timestamp_s')
+		year_index = this_year_df.index
+		print (this_year_df)
+		
+		saveat = result_dir +"/LW_HP/demand_years/{}.pdf".format(year)
+		coloraray, mappable = get_normcolor(c_value=range(len(year_index)), v_range=None)
+
+		x = range(len(year_index))
+		y = this_year_df['demand'].values
+		this_date = this_year_df['date'].values
+
+		xtick_pos = range(1, 365, 30)
+		xtick_name = [this_date[k] for k in xtick_pos]
+		# scatter_plot(x=x, y=y, 
+		# 	ax=None, xvline=None, yhline=None, 
+		# 	sigma=None, mode='scatter-line', lbl=None, name=name, 
+		# 	x_label='x', y_label='demand', 
+		# 	save_file=saveat, interpolate=False, coloraray=coloraray, mappable=mappable,
+		# 	xtick_pos=xtick_pos, xtick_name=xtick_name, 
+		# 	linestyle='-.', marker='o', title=None)
+
+
+		scatter_plot(x=x, y=y, 
+			ax=ax, xvline=None, yhline=None, 
+			sigma=None, mode='scatter-line', lbl=None, name=None, 
+			x_label='x', y_label='demand', 
+			save_file=allyear_file, interpolate=False, coloraray=coloraray, mappable=mappable,
+			xtick_pos=xtick_pos, xtick_name=xtick_name, 
+			linestyle='-.', marker='o', title=None)
+	
 	df.to_csv(input_dir + "LW_HP_process.csv")
+	return train_data, test_data
+
 
 def call_model(model, savedir, train_df, val_df, test_df):
 
@@ -115,8 +196,8 @@ def call_model(model, savedir, train_df, val_df, test_df):
 	# release_mem(fig)
 
 
-def run(prepr_data):
-	df = pd.read_csv(prepr_data, index_col=0)
+def train(train_data):
+	df = pd.read_csv(train_data, index_col=0)
 	column_indices = {name: i for i, name in enumerate(df.columns)}
 
 	n = len(df)
@@ -230,7 +311,9 @@ def run(prepr_data):
 if __name__ == "__main__":
 
 	# prepr_data = load_data()
-	prepr_data = load_lwhp_data()
+	# train(prepr_data)
+
+	train_data, test_data = load_lwhp_data()
+	train(train_data)
 
 	# # template data: prepr_data = result_dir +"/jena_climate_2009_2016.csv"
-	# run(prepr_data)

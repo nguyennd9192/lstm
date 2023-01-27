@@ -41,19 +41,27 @@ def scatter_plot(x, y, ax, xvline=None, yhline=None,
     sigma=None, mode='scatter', lbl=None, name=None, 
     x_label='x', y_label='y', 
     save_file=None, interpolate=False, coloraray=None, mappable=None, 
+    xtick_pos=None, xtick_name=None, 
+
     linestyle='-.', marker='o', title=None):
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(12, 9), linewidth=1.0) # 
+        fig, ax = plt.subplots(figsize=(16, 9), linewidth=1.0) # 
 
-    for i in range(len(x)):
-        ax.scatter(x[i], y[i], s=20, alpha=0.8, 
-            marker=marker, 
-            c=coloraray[i], edgecolor="black") 
+    if 'scatter' in mode:
+        for i in range(len(x)):
+            ax.scatter(x[i], y[i], s=50, alpha=0.8, 
+                marker=marker, 
+                c=coloraray[i], edgecolor="black") 
+
+    if 'line' in mode:
+        ax.plot(x, y, alpha=0.8) 
 
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.2)
-    fig.colorbar(mappable, cax=cax, shrink=0.6)
+
+    # if ax is None:
+    #     cax = divider.append_axes("right", size="5%", pad=0.2)
+    #     fig.colorbar(mappable, cax=cax, shrink=0.6)
 
 
     if xvline is not None:
@@ -68,8 +76,14 @@ def scatter_plot(x, y, ax, xvline=None, yhline=None,
             # if tmp_check_name(name=name[i]):
                # reduce_name = str(name[i]).split('_')[1]
                # plt.annotate(reduce_name, xy=(x[i], y[i]), size=5)
-            ax.annotate(name[i], xy=(x[i], y[i]), size=size_text, c="black")
+            if name[i] is not None:
+                ax.annotate(name[i], xy=(x[i], y[i]), size=4, c="black")
         
+    if xtick_pos is not None:
+        ax.set_xticks(xtick_pos)
+        ax.set_xticklabels(xtick_name, rotation=40, size=4)
+
+
     plt.title(title)
     ax.set_ylabel(y_label)
     ax.set_xlabel(x_label)
@@ -80,6 +94,6 @@ def scatter_plot(x, y, ax, xvline=None, yhline=None,
         plt.legend(prop={'size': 16})
         makedirs(save_file)
         plt.savefig(save_file)
-        release_mem(fig=fig)
+            # release_mem(fig=fig)
 
     return ax
