@@ -13,7 +13,8 @@ def compile_and_fit(model, window, patience=2):
 
   history = model.fit(window.train, epochs=MAX_EPOCHS,
                       validation_data=window.val,
-                      callbacks=[early_stopping])
+                      callbacks=[early_stopping]
+                      )
   return history
 
 

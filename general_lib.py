@@ -8,6 +8,11 @@ input_dir = main_dir + "input/"
 code_dir = main_dir + "code/"
 result_dir = main_dir + "result/"
 
+label_columns = ['demand']
+
+shift = 1
+iw = 100
+
 
 def makedirs(file):
 	if not os.path.isdir(os.path.dirname(file)):

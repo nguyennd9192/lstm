@@ -25,17 +25,22 @@ class WindowGenerator():
 		self.label_width = label_width
 		self.shift = shift
 
-		# # assume input_width = 6, shift = 5, label_width=1
 
 		self.total_window_size = input_width + shift
-		# # total_window_size = 11
 
 		self.input_slice = slice(0, input_width)
 		self.input_indices = np.arange(self.total_window_size)[self.input_slice]
 		self.label_start = self.total_window_size - self.label_width
 		self.labels_slice = slice(self.label_start, None)
 		self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
-		print (self.input_indices, self.label_indices)
+		print ("input_width", input_width)
+		print ("label_width", label_width)
+		print ("shift", shift)
+		print ("total_window_size", self.total_window_size)
+		print ("input_indices", self.input_indices)
+		print ("label_start", self.label_start)
+		print ("label_indices", self.label_indices)
+
 
 	def __repr__(self):
 		return '\n'.join([
@@ -75,14 +80,14 @@ class WindowGenerator():
 		return ds
 
 
-	def plot(self, model=None, plot_col='T (degC)', max_subplots=3):
+	def plot(self, model=None, plot_col=None, max_subplots=3):
 		inputs, labels = self.example
 		plt.figure(figsize=(12, 8))
 		plot_col_index = self.column_indices[plot_col]
 		max_n = min(max_subplots, len(inputs))
 		for n in range(max_n):
 			plt.subplot(max_n, 1, n+1)
-			plt.ylabel(f'{plot_col} [normed]')
+			plt.ylabel(f'{plot_col}')
 			plt.plot(self.input_indices, inputs[n, :, plot_col_index],
 			         label='Inputs', marker='.', zorder=-10)
 
@@ -105,7 +110,7 @@ class WindowGenerator():
 			if n == 0:
 			  plt.legend()
 
-		plt.xlabel('Time [h]')
+		plt.xlabel('Time')
 
 	@property
 	def train(self):
