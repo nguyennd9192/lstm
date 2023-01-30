@@ -12,7 +12,7 @@ label_columns = ['demand']
 
 shift = 1
 iw = 100
-
+demand_baseline = 200
 
 def makedirs(file):
 	if not os.path.isdir(os.path.dirname(file)):

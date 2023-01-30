@@ -5,7 +5,16 @@ from model import *
 from plot import *
 from sklearn.preprocessing import MaxAbsScaler
 import joblib
+from keras.layers.convolutional import MaxPooling1D
+from keras.layers import Dropout, Flatten
+from tensorflow.keras.layers import Dense, LSTM, Lambda, Bidirectional, TimeDistributed
+from tensorflow.keras.metrics import RootMeanSquaredError, MeanAbsoluteError
+from tensorflow.keras.models import Sequential
+from keras.layers.convolutional import Conv1D
+from keras.layers.convolutional import MaxPooling1D
 
+from sklearn.preprocessing import MinMaxScaler
+from keras.layers import ConvLSTM2D
 
 
 
@@ -222,10 +231,24 @@ def train(train_data, savedir, model_type='base', out_steps=1):
 	df = pd.read_csv(train_data, index_col=0)
 	column_indices = {name: i for i, name in enumerate(df.columns)}
 
+	# scaler = MinMaxScaler()
+	# df[label_columns] = scaler.fit_transform(df[label_columns])
+	df[label_columns] -= demand_baseline
+
+
 	n = len(df)
-	train_df = df[0:int(n*0.6)]
-	val_df = df[int(n*0.6):int(n*0.8)]
-	test_df = df[int(n*0.8):]
+
+	n_test = max(int(n*0.2), 450)
+	
+	n_train_val = len(df) - n_test
+	n_val = max(int(n_train_val*0.3), 450)
+	n_train = n_train_val - n_val
+	assert n_train + n_val + n_test == n
+
+
+	train_df = df[0:n_train]
+	val_df = df[n_train:n_train+n_val]
+	test_df = df[-n_test:]
 
 	num_features = df.shape[1]
 
@@ -310,55 +333,114 @@ def train(train_data, savedir, model_type='base', out_steps=1):
 				kernel_initializer=tf.initializers.zeros())
 				]))
 	
+	if model_type == 'multi-linear':
+		model = tf.keras.Sequential()
+		# 	# Shape [batch, time, features] => [batch, 1, features]
+		model.add(Lambda(lambda x: x[:, -1:, :]))
+		model.add(Dense(out_steps*num_features))
 
-	if model_type=='multi-linear':
-		model = tf.keras.Sequential([
-		# Take the last time-step.
-		# Shape [batch, time, features] => [batch, 1, features]
-		tf.keras.layers.Lambda(lambda x: x[:, -1:, :]),
-		# Shape => [batch, 1, out_steps*features]
-		tf.keras.layers.Dense(out_steps*num_features,
-							  kernel_initializer=tf.initializers.zeros()),
+		# model.add(Dense(out_steps*num_features*2))
+		# model.add(Dropout(rate=0.2))
 
-		# tf.keras.layers.LSTM(int(0.5*out_steps*num_features), return_sequences=True),
 
-		tf.keras.layers.Dense(out_steps*num_features),
-		# Shape => [batch, out_steps, features]
-		tf.keras.layers.Reshape([out_steps, num_features]) 
-	])
+		model.add(Dense(64, kernel_initializer=tf.initializers.zeros()))
+
+		# model.add(Dropout(rate=0.3))
+		# model.add(Dense(128, kernel_initializer=tf.initializers.zeros()))
+
+		# model.add(Dense(1024))
+		# model.add(Dropout(rate=0.3))
+
+		model.add(Dense(out_steps*num_features))
+
+		model.add(tf.keras.layers.Reshape([out_steps, num_features])) 		
+
+
+	if model_type=='multi-lstm':
+		params = {
+					"dropout": 0.3,
+					"lstm_units": 50,
+				}
+		model = tf.keras.Sequential()
+		# 	# Shape [batch, time, features] => [batch, 1, features]
+		model.add(Lambda(lambda x: x[:, -1:, :]))
+		# model.add(Dense(out_steps*num_features, kernel_initializer=tf.initializers.zeros()))
+
+		model.add( Bidirectional(LSTM(units=params["lstm_units"], return_sequences=True, 
+					activation='relu',))		)
+		# model.add( Bidirectional(LSTM(units=params["lstm_units"], activation='relu'))
+		# )
+
+
+		# model.add(LSTM(units=params["lstm_units"], return_sequences=False))
+		# model.add(Dropout(rate=params["dropout"]))
+
+		model.add(Dense(out_steps*num_features))
+		model.add(tf.keras.layers.Reshape([out_steps, num_features])) 		
+
+
+	if model_type=='multi-cnn_lstm':
+		model = tf.keras.Sequential()
+		# model.add(Lambda(lambda x: x[:, -1:, :]))
+		model.add(ConvLSTM2D(filters=64, kernel_size=(1,2), activation='relu', 
+			# input_shape=(n_seq, 1, n_steps, n_features)
+			)
+		)
+
+		# model.add(TimeDistributed(Conv1D(filters=64, kernel_size=2, activation='relu'), 
+		# 	# input_shape=(None, 1, num_features)
+		# 	)
+		# )
+		# model.add(TimeDistributed(MaxPooling1D(pool_size=2)))
+		# model.add(TimeDistributed(Flatten()))
+		# model.add( Bidirectional(LSTM(units=50, activation='relu',)))
+		model.add(Dense(out_steps*num_features))
+		model.add(tf.keras.layers.Reshape([out_steps, num_features])) 		
+
 
 	model_dir = call_model(model=model, savedir=savedir,
 		train_df=train_df, val_df=val_df, test_df=test_df, out_steps=out_steps)
+
+
+
 
 
 	return model_dir
 
 def predict(model_dir, train_data, test_data, out_steps):
 	df = pd.read_csv(train_data, index_col=0)
-	test_df = pd.read_csv(test_data, index_col=0)
-	test_df[label_columns[0]] = 10
+	test_df_org = pd.read_csv(test_data, index_col=0)
+	test_df_org[label_columns[0]] = None
+
+	# scaler = MinMaxScaler()
+	# df[label_columns] = scaler.fit_transform(df[label_columns])
+	df[label_columns] -= demand_baseline
 
 
 	n_train = int(len(df)*0.7)
 	train_df = df[0:n_train]
 	val_df = df[n_train:]
 
+	tmp = [df[-iw:], test_df_org]
+	test_df = pd.concat(tmp, ignore_index=False)
+
 	model = joblib.load(model_dir)
 	window = WindowGenerator(
 		input_width=iw, label_width=out_steps, shift=out_steps,
 		train_df=train_df, val_df=val_df, test_df=test_df,
 		label_columns=label_columns)
+	pred_data = window.test
+
 
 	# x_test = np.array(test_df.values, dtype=np.float32)
 	# ds = tf.keras.utils.timeseries_dataset_from_array(
 	# 	  data=x_test,
 	# 	  targets=None,
-	# 	  sequence_length=window.total_window_size,
+	# 	  sequence_length=len(test_df), # window.total_window_size
 	# 	  sequence_stride=1,
-	# 	  shuffle=True,
-	# 	  batch_size=32,)
-	# ds = ds.map(window.split_window)
-	pred_data = window.test
+	# 	  shuffle=False,
+	# 	  batch_size=len(test_df),)
+	# pred_data = ds.map(window.split_window)
 
 
 
@@ -371,27 +453,50 @@ def predict(model_dir, train_data, test_data, out_steps):
 
 	# print (list(test_set.as_numpy_iterator()))
 	# for elem in list(pred_data.as_numpy_iterator()):
+	label_col_index = window.label_columns_indices.get(label_columns[0], None)
 	
-	predictions =  model.predict(pred_data)
+	predictions_scaled =  model.predict(pred_data)
+	# predictions = scaler.inverse_transform(predictions_scaled[0, :, label_col_index].reshape(-1, 1))
+	predictions = predictions_scaled[0, :, label_col_index] + demand_baseline
+	test_df_org["predicted"] = predictions
+	test_df_org.to_csv(test_data.replace(".csv", "_pred.csv"))
+
+
 	print("elem pred", predictions)
 	print ("shape:", predictions.shape)
 
 
-	fig = plt.figure(figsize=(12, 8))
+	fig, ax = plt.subplots(figsize=(16, 9), linewidth=1.0) # 
+
 	# plt.plot(window.input_indices, inputs[n, :, plot_col_index],
 	# 		         label='Inputs', marker='.', zorder=-10)
-	label_col_index = window.label_columns_indices.get(label_columns[0], None)
 
-	y22_df = df[df['year'] == 2022]
-	x = range(len(y22_df))
-	y = y22_df['demand'].values
-	# this_date = y22_df['date'].values
-	plt.scatter(x, y,
-	       marker='.', color="blue", s=30)
+	# # show inputs
+	y_scaled = test_df[:iw][label_columns].values
+	# y = scaler.inverse_transform(y_scaled)
+	y = y_scaled + demand_baseline
+	x = range(len(y))
 
-	plt.scatter(window.label_indices, predictions[1, :, label_col_index],
-	      marker='X', edgecolors='k', label='Predictions',
-	      c='#ff7f0e', s=64)
+	plt.scatter(x, y,  marker='.', color="blue", s=30, label='Most updated data')
+	plt.plot(x, y, color="blue", linestyle="-")
+
+	plt.scatter(window.label_indices, predictions,
+			marker='X', edgecolors='k', label='Predictions',
+			c='#ff7f0e', s=64)
+	plt.plot(window.label_indices, predictions, 
+			color="#ff7f0e", linestyle="-.")
+
+
+	date =["{0}/{1}/{2}".format(test_df.loc[i, "year"], 
+		test_df.loc[i, "month"], test_df.loc[i, "day"]) 
+					for i in test_df.index ]
+	xtick_pos = range(1, len(date), 30)
+	xtick_name = [date[k] for k in xtick_pos]
+	ax.set_xticks(xtick_pos)
+	ax.set_xticklabels(xtick_name, rotation=40)
+	ax.tick_params(axis='both', labelsize=16)
+	plt.title("Prediction using {}".format(model_type))
+	plt.legend()
 
 	saveat = result_dir +"/predictions.pdf"
 	makedirs(saveat)
@@ -403,7 +508,7 @@ def predict(model_dir, train_data, test_data, out_steps):
 if __name__ == "__main__":
 	train_data = input_dir + "LW_HP_train.csv"
 	test_data = input_dir + "LW_HP_test.csv"
-	model_type = 'multi-linear'
+	model_type = 'multi-lstm' # 'multi-linear', 'multi-lstm', 'multi-cnn_lstm'
 	result_dir += '/LW_HP/{}/'.format(model_type)
 
 	# prepr_data = load_data()
@@ -415,7 +520,7 @@ if __name__ == "__main__":
 
 	# # base, linear, dens, res-net, lstm
 	fc_df = pd.read_csv(test_data, index_col=0)
-	out_steps = 20 # len(fc_df) # int()) int(len(fc_df) / 5) 10
+	out_steps = len(fc_df) # len(fc_df) # int()) int(len(fc_df) / 5) 10
 	model_dir = train(train_data, savedir=result_dir, 
 		model_type=model_type, out_steps=out_steps) 
 

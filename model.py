@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 
-MAX_EPOCHS = 20
+MAX_EPOCHS = 200
 def compile_and_fit(model, window, patience=2):
   early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
                                                     patience=patience,
