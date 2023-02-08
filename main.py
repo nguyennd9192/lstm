@@ -501,7 +501,7 @@ if __name__ == "__main__":
 
 
 	# # for lwhp data
-	# load_lwhp_data(train_data, test_data)
+	load_lwhp_data(train_data, test_data)
 
 	# # base, linear, dens, res-net, lstm
 	fc_df = pd.read_csv(test_data, index_col=0)
