@@ -59,9 +59,9 @@ def scatter_plot(x, y, ax, xvline=None, yhline=None,
 
     divider = make_axes_locatable(ax)
 
-    # if ax is None:
-    #     cax = divider.append_axes("right", size="5%", pad=0.2)
-    #     fig.colorbar(mappable, cax=cax, shrink=0.6)
+    if ax is None:
+        cax = divider.append_axes("right", size="5%", pad=0.2)
+        fig.colorbar(mappable, cax=cax, shrink=0.6)
 
 
     if xvline is not None:
@@ -94,6 +94,7 @@ def scatter_plot(x, y, ax, xvline=None, yhline=None,
         plt.legend(prop={'size': 16})
         makedirs(save_file)
         plt.savefig(save_file)
-            # release_mem(fig=fig)
+        if ax is None:
+            release_mem(fig=fig)
 
     return ax

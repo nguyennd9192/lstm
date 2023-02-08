@@ -82,63 +82,66 @@ def load_lwhp_data(train_data, test_data):
 
 	# # ind
 	# # # merge
-	fig = plt.figure(figsize=(9, 16), linewidth=0.8)
-	years = range(2018, 2023) # list(set(df['year']))
-	n_years = len(years)
-	grid = plt.GridSpec(n_years, 4, hspace=0.3, wspace=1)
 
+	features = ["high_temp", "demand", "low_temp"]
+	for feature in features:
+		fig = plt.figure(figsize=(9, 16), linewidth=0.8)
+		years = range(2018, 2022) # list(set(df['year']))
+		n_years = len(years)
+		grid = plt.GridSpec(n_years, 4, hspace=0.3, wspace=1)
 
-	for ith, year in enumerate(years):
-		if ith==0:
+		for ith, year in enumerate(years):
 			ax = fig.add_subplot(grid[ith, :]) # xticklabels=[], sharex=ax
-			allyear_file = None
 
-		elif ith == len(years) - 1:
-			ax = fig.add_subplot(grid[ith, :])
-			allyear_file = result_dir +"/LW_HP/demand_years/multiple.pdf"
+			if ith == len(years) - 1:
+				allyear_file = result_dir +"/LW_HP/{}_years/multiple.pdf".format(feature)
 
-		else:
-			ax = fig.add_subplot(grid[ith, :])
-			allyear_file = None
+			else:
+				allyear_file = None
 
 
-		this_year_df = df[df['year'] == year]#.sort_values('timestamp_s')
-		year_index = this_year_df.index
-		print (this_year_df)
-		
-		saveat = result_dir +"/data/demand_years/{}.pdf".format(year)
-		coloraray, mappable = get_normcolor(c_value=range(len(year_index)), v_range=None)
+			this_year_df = df[df['year'] == year]#.sort_values('timestamp_s')
+			year_index = this_year_df.index
+			print (this_year_df)
+			
+			saveat = result_dir +"/data/{}_years/{}.pdf".format(feature, year)
+			coloraray, mappable = get_normcolor(c_value=range(len(year_index)), v_range=None)
 
-		x = range(len(year_index))
-		y = this_year_df['demand'].values
-		this_date = this_year_df['date'].values
+			x = range(len(year_index))
+			y = this_year_df[feature].values
+			this_date = this_year_df['date'].values
 
-		xtick_pos = range(1, 365, 30)
-		xtick_name = [this_date[k] for k in xtick_pos]
-		scatter_plot(x=x, y=y, 
-			ax=None, xvline=None, yhline=None, 
-			sigma=None, mode='scatter-line', lbl=None, name=name, 
-			x_label='x', y_label='demand', 
-			save_file=saveat, interpolate=False, coloraray=coloraray, mappable=mappable,
-			xtick_pos=xtick_pos, xtick_name=xtick_name, 
-			linestyle='-.', marker='o', title=None)
+			xtick_pos = range(1, 365, 30)
+			xtick_name = [this_date[k] for k in xtick_pos]
+			# scatter_plot(x=x, y=y, 
+			# 	ax=None, xvline=None, yhline=None, 
+			# 	sigma=None, mode='scatter-line', lbl=None, name=name, 
+			# 	x_label='x', y_label=feature, 
+			# 	save_file=saveat, interpolate=False, coloraray=coloraray, mappable=mappable,
+			# 	xtick_pos=xtick_pos, xtick_name=xtick_name, 
+			# 	linestyle='-.', marker='o', title=None)
 
 
-		scatter_plot(x=x, y=y, 
-			ax=ax, xvline=None, yhline=None, 
-			sigma=None, mode='scatter-line', lbl=None, name=None, 
-			x_label='x', y_label='demand', 
-			save_file=allyear_file, interpolate=False, coloraray=coloraray, mappable=mappable,
-			xtick_pos=xtick_pos, xtick_name=xtick_name, 
-			linestyle='-.', marker='o', title=None)
+			scatter_plot(x=x, y=y, 
+				ax=ax, xvline=None, yhline=None, 
+				sigma=None, mode='scatter-line', lbl=None, name=None, 
+				x_label='x', y_label=feature, 
+				save_file=allyear_file, interpolate=False, coloraray=coloraray, mappable=mappable,
+				xtick_pos=xtick_pos, xtick_name=xtick_name, 
+				linestyle='-.', marker='o', title=None)
 	
 	df.to_csv(input_dir + "LW_HP_process.csv")
 
 
-	# # # split train/test
-	mask = df['demand'].isnull()
+	# # # # split train/test
+	# # mask = df['demand'].isnull() # # for null ground truth
+	n_test = 200
+	mask = np.zeros(n_days, dtype=bool)
+	mask[-n_test:] = True
+
 	test_df = df[mask]
 	train_df = df[~mask]
+
 
 	pv = ["high_temp", "low_temp", "year", "month", "day",
 		"Year_sin",	"Year_cos"]
@@ -146,19 +149,20 @@ def load_lwhp_data(train_data, test_data):
 	train_df = train_df[pv]
 	test_df = test_df[pv]
 
-	# abs_scaler = MaxAbsScaler()
-	# abs_scaler.fit(train_df)
-	# scaled_train_data = abs_scaler.transform(train_df)
-	# scaled_test_data = abs_scaler.transform(test_df)
+	abs_scaler = MaxAbsScaler()
+	abs_scaler.fit(train_df)
+	scaled_train_data = abs_scaler.transform(train_df)
+	scaled_test_data = abs_scaler.transform(test_df)
 
-	# scaled_train_df = pd.DataFrame(scaled_train_data, columns=train_df.columns)
-	# scaled_test_df = pd.DataFrame(scaled_test_data, columns=train_df.columns)
+	scaled_train_df = pd.DataFrame(scaled_train_data, columns=train_df.columns)
+	scaled_test_df = pd.DataFrame(scaled_test_data, columns=train_df.columns)
 
-	# scaled_train_df[label_columns] = df[~mask][label_columns]
-	# scaled_train_df.to_csv(train_data)
-	# scaled_test_df.to_csv(test_data)
+	scaled_train_df[label_columns] = df[~mask][label_columns]
+	scaled_train_df.to_csv(train_data)
+	scaled_test_df.to_csv(test_data)
 
 	train_df[label_columns] = df[~mask][label_columns]
+	test_df[label_columns] = df[mask][label_columns]
 
 	train_df.to_csv(train_data)
 	test_df.to_csv(test_data)
@@ -368,10 +372,6 @@ def train(train_data, savedir, model_type='base', out_steps=1):
 
 		model.add( Bidirectional(LSTM(units=params["lstm_units"], return_sequences=True, 
 					activation='relu',))		)
-		# model.add( Bidirectional(LSTM(units=params["lstm_units"], activation='relu'))
-		# )
-
-
 		# model.add(LSTM(units=params["lstm_units"], return_sequences=False))
 		# model.add(Dropout(rate=params["dropout"]))
 
@@ -410,7 +410,7 @@ def train(train_data, savedir, model_type='base', out_steps=1):
 def predict(model_dir, train_data, test_data, out_steps):
 	df = pd.read_csv(train_data, index_col=0)
 	test_df_org = pd.read_csv(test_data, index_col=0)
-	test_df_org[label_columns[0]] = None
+	# test_df_org[label_columns[0]] = None
 
 	# scaler = MinMaxScaler()
 	# df[label_columns] = scaler.fit_transform(df[label_columns])
@@ -431,32 +431,9 @@ def predict(model_dir, train_data, test_data, out_steps):
 		label_columns=label_columns)
 	pred_data = window.test
 
-
-	# x_test = np.array(test_df.values, dtype=np.float32)
-	# ds = tf.keras.utils.timeseries_dataset_from_array(
-	# 	  data=x_test,
-	# 	  targets=None,
-	# 	  sequence_length=len(test_df), # window.total_window_size
-	# 	  sequence_stride=1,
-	# 	  shuffle=False,
-	# 	  batch_size=len(test_df),)
-	# pred_data = ds.map(window.split_window)
-
-
-
-	# for elem in iter(pred_data):	
-	# 	inputs, labels = elem
-
-	# 	print (labels)
-	# 	print (inputs.shape)
-	# 	a += 1
-
-	# print (list(test_set.as_numpy_iterator()))
-	# for elem in list(pred_data.as_numpy_iterator()):
 	label_col_index = window.label_columns_indices.get(label_columns[0], None)
 	
 	predictions_scaled =  model.predict(pred_data)
-	# predictions = scaler.inverse_transform(predictions_scaled[0, :, label_col_index].reshape(-1, 1))
 	predictions = predictions_scaled[0, :, label_col_index] + demand_baseline
 	test_df_org["predicted"] = predictions
 	test_df_org.to_csv(test_data.replace(".csv", "_pred.csv"))
@@ -485,6 +462,14 @@ def predict(model_dir, train_data, test_data, out_steps):
 			c='#ff7f0e', s=64)
 	plt.plot(window.label_indices, predictions, 
 			color="#ff7f0e", linestyle="-.")
+
+
+	plt.scatter(window.label_indices, test_df_org[label_columns[0]], 
+		color="black", marker='o', edgecolors='k', label='True value')
+	plt.plot(window.label_indices, test_df_org[label_columns[0]],
+		 color="black", linestyle="-")
+
+	
 
 
 	date =["{0}/{1}/{2}".format(test_df.loc[i, "year"], 
@@ -520,7 +505,7 @@ if __name__ == "__main__":
 
 	# # base, linear, dens, res-net, lstm
 	fc_df = pd.read_csv(test_data, index_col=0)
-	out_steps = len(fc_df) # len(fc_df) # int()) int(len(fc_df) / 5) 10
+	out_steps = len(fc_df) 
 	model_dir = train(train_data, savedir=result_dir, 
 		model_type=model_type, out_steps=out_steps) 
 
