@@ -367,10 +367,9 @@ def train(train_data, savedir, model_type='base', out_steps=1):
 				}
 		model = tf.keras.Sequential()
 		# 	# Shape [batch, time, features] => [batch, 1, features]
-		model.add(Lambda(lambda x: x[:, -1:, :]))
-		# model.add(Dense(out_steps*num_features, kernel_initializer=tf.initializers.zeros()))
+		model.add(Lambda(lambda x: x[:, -3:, :]))
 
-		model.add( Bidirectional(LSTM(units=params["lstm_units"], return_sequences=True, 
+		model.add( Bidirectional(LSTM(units=params["lstm_units"], return_sequences=False, 
 					activation='relu',))		)
 		# model.add(LSTM(units=params["lstm_units"], return_sequences=False))
 		# model.add(Dropout(rate=params["dropout"]))
@@ -501,7 +500,7 @@ if __name__ == "__main__":
 
 
 	# # for lwhp data
-	load_lwhp_data(train_data, test_data)
+	# load_lwhp_data(train_data, test_data)
 
 	# # base, linear, dens, res-net, lstm
 	fc_df = pd.read_csv(test_data, index_col=0)
